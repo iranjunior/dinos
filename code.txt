@@ -1,0 +1,342 @@
+============= index.js =========================
+>>>> Inicio
+
+const listMoreFast = require('./dinos');
+
+listMoreFast('dataset1.csv', 'dataset2.csv', 'bipedal');
+
+>>>> Fim
+============= index.js =========================
+
+
+============= dinos.js =========================
+>>>> Inicio
+
+const _fileSystem = require('fs');
+const _readline = require('readline');
+const _path = require('path');
+const _caculateSpeed = require('./caculateSpeed');
+const _namesMoreFast = require('./nameMoreFast');
+const _writeFile = require('./writeFile');
+
+const prepareDatasFileOne = (line, dinos, hashTable, caculateSpeed, writeFile, namesMoreFast) => {
+  if (line.includes('NAME')) {
+    return;
+  }
+  const [dino, leg] = line.split(',');
+
+  if (hashTable.has(dino)) {
+    dinos.push({
+      name: dino,
+      speed: caculateSpeed(leg, hashTable.get(dino), dino),
+    });
+    writeFile(namesMoreFast(dinos));
+  } else {
+    hashTable.set(dino, leg);
+  }
+}
+
+const prepareDatasFileTwo = (line, dinos, hashTable, characteristic, caculateSpeed, writeFile, namesMoreFast) => {
+  if (line.includes('NAME')) {
+    return;
+  }
+  const [dino, stance, type] = line.split(',');
+  if (hashTable.has(dino) && type === characteristic) {
+    dinos.push({
+      name: dino,
+      speed: caculateSpeed(hashTable.get(dino), stance),
+    });
+    writeFile(namesMoreFast(dinos));
+  } else {
+    hashTable.set(dino, stance);
+  }
+  if (type !== characteristic && dinos.findIndex((value) => value.name === dino) !== -1) {
+    dinos = dinos.filter((dinoCurrent) => dinoCurrent.name !== dino);
+    writeFile(namesMoreFast(dinos));
+  }
+}
+
+/**
+ * @description Esse é o metódo principal da arquivo, aqui é setado a leitura dos arquivos csv com dados sobre os Dinossauros
+ *
+ * @param {string} dataset1 nome do arquivo que apresenta o dataset1
+ * @param {string} dataset2 nome do arquivo que apresenta o dataset2
+ * @param {string} characteristic caracteristica do dinossoura que deve ser avaliada
+ * @param  {...any} dependencies dependencias que serão usadas na função, devem ser o fs, readline e path, respectivamente
+ */
+module.exports = (
+  dataset1, 
+  dataset2, 
+  characteristic,
+  fs = _fileSystem,
+  rl = _readline,
+  path =_path,
+  caculateSpeed = _caculateSpeed,
+  namesMoreFast = _namesMoreFast,
+  writeFile = _writeFile,
+  ) => {
+  
+  let dinos = [];
+  const hashTable = new Map();
+
+  const RLDataset1 = rl.createInterface({
+    input: fs.createReadStream(path.resolve(__dirname, dataset1)),
+  });
+
+  const RLDataset2 = rl.createInterface({
+    input: fs.createReadStream(path.resolve(__dirname, dataset2)),
+  });
+
+  RLDataset1.on('line',(line) => prepareDatasFileOne(line, dinos, hashTable, caculateSpeed, writeFile, namesMoreFast));
+
+  RLDataset2.on('line',(line) => prepareDatasFileTwo(line, dinos, hashTable, characteristic, caculateSpeed, writeFile, namesMoreFast));
+};
+
+
+>>>> Fim
+============= dinos.js =========================
+
+
+============= calculateSpeed.js =================
+>>>> Inicio
+
+
+/**
+ * @description Esse é o metódo responsavel por calcular a velocidade de um dinossauro a partir do
+ * valor do comprimento da perna e do seu passo
+ *
+ * @param {number | string} leg valor referente ao comprimento da perna do dinossoauro
+ * @param {number | string} stance valor referente ao comprimento do passo do dinossauro
+ *
+ * @returns {number} valor referente a velocidade alcançada, a partir dos valores de entrada
+ */
+
+module.exports = (leg, stance) => {
+    const GRAVITY = 9.8;
+    leg = Number.isNaN(Number(leg)) ? 1 : Number(leg); // O valor 0.01 foi atribuido para que não houvesse uma divisão por zero
+    stance = Number.isNaN(Number(stance)) ? 1 : Number(stance);
+  
+    return (((stance / leg) - 1) * Math.sqrt(leg * GRAVITY));
+  };
+
+>>>> Fim
+============= calculateSpeed.js =================
+
+
+============= nameMoreFast.js ===================
+>>>> Inicio
+
+ 
+/**
+ * @description Esse é o metódo responsavel por gerar a lista de dinossauros mais rapidos
+ *
+ * @param {object[]} dinos array de objetos com os dados dos dinossauros
+ *
+ * @returns {string} lista de dinossauros que ordenados de forma decrescente pela sua velocidade
+ */
+
+module.exports = (dinos) => {
+  if (!Array.isArray(dinos)) {
+    return new Error('O tipo esperado é um array');
+  }
+  const { length } = dinos;
+  switch (length) {
+    case 0:
+      return '';
+    case 1:
+      return String(dinos[0].name).concat('\n');
+    default:
+      dinos.sort((a, b) => b.speed - a.speed);
+      return dinos.map((dino) => dino.name).join('\n');
+  }
+};
+
+>>>> Fim
+============= nameMoreFast.js ===================
+
+
+============= writeFile.js ======================
+>>>> Inicio
+
+
+const fileSystem = require('fs');
+
+/**
+ * @description Esse metódo é responsavel por escrever um dado em disco.
+ *
+ * @param {object} fs dependencia da função, usado para escrever os dados em disco
+ * @param {string} data dado a ser gravado no arquivo de saida
+ * @param {string}[file] file nome do arquivo que deverá ser gravado
+ */
+
+module.exports = (data, file = 'output.txt', fs = fileSystem,) => {
+    try {
+      if (typeof data !== 'string') {
+        JSON.stringify(data);
+      }
+      fs.writeFileSync(file, data.toString());
+    } catch (error) {
+      throw new Error('Erro ao gravar arquivo');
+    }
+  };
+
+
+>>>> Fim
+============= nameMoreFast.js ===================
+
+
+========================================================== TESTES ======================================================
+
+============= dinos.spec.js ======================
+>>>> Inicio
+
+const fs = require('fs');
+const readline = require('readline');
+
+const listMoreFast = require('./dinos');
+const writeFile = require('./writeFile');
+const calculateSpeed = require('./caculateSpeed');
+const nameMoreFast = require('./nameMoreFast');
+
+jest.mock('fs');
+jest.mock('readline');
+jest.mock('path');
+
+describe('Testes unitarios', () => {
+
+    describe('Testes de escrita de arquivo em disco', () => {
+        
+        it('Deve listar dinos', () => {
+            const mockFsCreateReadStream = fs.createReadStream.mockImplementation(() => {});
+            const mockFsWriteFile = fs.writeFileSync.mockImplementation(() => {});
+            const mockRlCreateInterface = readline.createInterface.mockImplementation(
+                () => ({ on: (type, cb) => cb('Tyrannosaurus Rex,5.76,bipedal')}
+                ));
+            listMoreFast('teste1.csv', 'teste1.csv', 'bipedal');
+            expect(mockRlCreateInterface).toHaveBeenCalled();
+            expect(mockFsCreateReadStream).toHaveBeenCalled();
+            expect(mockFsWriteFile).toHaveBeenCalled();
+            expect(mockFsWriteFile.mock.calls[0][0]).toBe('output.txt');
+            expect(mockFsWriteFile.mock.calls[0][1]).toContain('Tyrannosaurus Rex');
+        });
+        it('Deve pular linha que tem o cabeçalho', () => {
+            const mockFsCreateReadStream = fs.createReadStream.mockImplementation(() => {});
+            const mockRlCreateInterface = readline.createInterface.mockImplementation(
+                () => ({ on: (type, cb) => cb('NAME')}
+                ));
+            listMoreFast('teste1.csv', 'teste1.csv', 'bipedal');
+            expect(mockRlCreateInterface).toHaveBeenCalled();
+            expect(mockFsCreateReadStream).toHaveBeenCalled();
+        });
+    });
+    describe('Testes de escrita de arquivo em disco', () => {
+
+    it('deve gravar em disco corretamente', () => {
+        const mockFs = fs.writeFileSync.mockImplementation((name, data) => {});
+        
+        writeFile('teste', 'output.txt');
+
+        expect(mockFs).toHaveBeenCalled()
+        expect(mockFs.mock.calls[0][0]).toBe('output.txt');
+        expect(mockFs.mock.calls[0][1]).toBe('teste');
+    });
+    it('deve gravar em disco corretamente apesar do dado não ter sido uma string', () => {
+        const mockFs = fs.writeFileSync.mockImplementation((name, data) => {});
+        
+        writeFile(12);
+
+        expect(mockFs).toHaveBeenCalled()
+        expect(mockFs.mock.calls[0][0]).toBe('output.txt');
+        expect(mockFs.mock.calls[0][1]).toBe('12');
+    });
+  it('deve falhar gravamento em disco devido o dado não ser valido', () => {
+        const mockFs = fs.writeFileSync.mockImplementation(() => new Error('Error'));
+        try {
+            writeFile(null);
+        } catch (error) {
+            expect(error.message).toBe('Erro ao gravar arquivo');
+        }
+    });
+    });
+    
+    describe('Testes de calculos de velocidade', () => {
+
+  it('deve calcular a velocidade do dino corretamente passando strings', () => {
+        
+        const response = calculateSpeed('1.2', '1.45');
+     
+        expect(response).toBe(0.71443450831176);
+    });
+
+  it('deve calcular a falhar no calculo devido os dados passados não serem validos', () => {
+        
+        const response = calculateSpeed('ba', 'av');
+     
+        expect(response).toBe(0);
+    });
+
+  it('deve calcular a velocidade do dino corretamente passando numeros', () => {
+        
+        const response = calculateSpeed(1.2, 1.45);
+     
+        expect(response).toBe(0.71443450831176);
+    });
+    });
+    describe('Testes da listagem de dinossauros', () => {
+
+  it('Deve retornar a lista de dinos ordenados do mais rapido ao mais lento', () => {
+        const dinos = [{name: 'dinoSlow', speed: 100}, {name: 'dinoFast', speed: 1100}, {name: 'dinoMedium', speed: 1000}];
+        const response = nameMoreFast(dinos);
+
+        expect(response.indexOf('dinoFast')).toBe(0);
+        expect(response.indexOf('dinoMedium')).toBe(9);
+        expect(response.indexOf('dinoSlow')).toBe(20);
+    });
+  it('Deve retornar apenas o nome do dinossauro passado', () => {
+        const dinos = [{name: 'dinoSlow', speed: 100}];
+        const response = nameMoreFast(dinos);
+
+        expect(response.indexOf('dinoSlow')).toBe(0);
+    });
+  it('Deve retornar apenas uma string vazia', () => {
+        const dinos = [];
+        const response = nameMoreFast(dinos);
+
+        expect(response).toBe('');
+    });
+    
+  it('Deve falhar devido o dado enviado não ser um array', () => {
+        try {
+            nameMoreFast();   
+        } catch (error) {
+            expect(error).toBe('O tipo esperado é um array')
+        }
+    });
+    });
+});
+
+
+>>>> Fim
+============= dinos.spec.js ===================
+
+
+
+
+
+============= dinos.sys.spec.js ======================
+>>>> Inicio
+
+const fs = require('fs');
+
+const listMoreFast = require('./dinos');
+
+describe('Testes de integração', () => {
+    it('Deve Listar os mais rapidos com sucesso', () => {
+        listMoreFast('dataset1.csv', 'dataset2.csv', 'bipedal');
+
+        expect(Date.now() - fs.statSync('./output.txt').mtimeMs).toBeLessThanOrEqual(10000);
+    })
+});
+
+>>>> Fim
+============= dinos.spec.js ===================
